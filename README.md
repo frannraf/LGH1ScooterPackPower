@@ -42,6 +42,8 @@ Use these board options when you want USB serial debug output:
 
 Open the serial monitor at `115200` baud after upload. Because USB serial uses `PA11`/`PA12`, CAN is remapped to `PB8`/`PB9`.
 
+If you do not want to open Arduino IDE, flash the prebuilt binary in `firmware/` with STM32CubeProgrammer or OpenOCD. See `firmware/README.md`.
+
 No external Arduino CAN library is required. The sketch uses the STM32F1 bxCAN peripheral registers directly.
 
 The Arduino sketch has two tabs:
@@ -62,10 +64,12 @@ The sketch sends standard CAN ID `0x630` with this eight-byte payload:
 - `01` for wake/on request
 - `00` for sleep/off request, though the current auto-wake behavior only sends wake/on
 
-On boot, the controller waits `5 seconds`, sends ten wake/on frames spaced `500 ms` apart, then keeps sending a wake/on frame every `500 ms`.
+On boot, the controller waits `1 second`, sends ten wake/on frames spaced `500 ms` apart, then keeps sending a wake/on frame every `500 ms`.
 
 LED states:
 
+- Short blink at boot: firmware started
+- Repeating short blink during the 1-second startup delay: waiting before the wake attempt
 - Three quick flashes plus a long pause: CAN initialization or wake transmit failed
 - Breathing pattern: startup wake frames were transmitted successfully
 

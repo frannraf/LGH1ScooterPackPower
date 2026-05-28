@@ -13,7 +13,7 @@
 
 static constexpr uint32_t kSerialBaud = 115200;
 static constexpr uint32_t kUsbSerialConnectWaitMs = 3000;
-static constexpr uint32_t kBootWakeDelayMs = 5000;
+static constexpr uint32_t kBootWakeDelayMs = 1000;
 static constexpr uint32_t kWakeIntervalMs = 500;
 static constexpr uint8_t kStartupWakeAttempts = 10;
 
@@ -36,16 +36,19 @@ static void canPrintReceivedMessages();
 static bool canSendPackWakeCommand(bool wakeEnabled);
 
 static void beginDebugSerial();
+static void waitBeforeWakeAttempt();
 static bool runStartupWakeSequence();
 static void serviceWakeKeepAlive();
 static void serviceBreathingLed();
 static uint8_t breathingBrightness();
+static void blinkStatus(uint8_t count, uint16_t onMs, uint16_t offMs);
 static void blinkCanFailure();
 
 void setup()
 {
   pinMode(kStatusLedPin, OUTPUT);
   digitalWrite(kStatusLedPin, kLedOffLevel);
+  blinkStatus(1, 80, 120);
 
   beginDebugSerial();
 
@@ -62,7 +65,7 @@ void setup()
   Serial.print("Waiting ");
   Serial.print(kBootWakeDelayMs / 1000);
   Serial.println(" seconds before wake attempt...");
-  delay(kBootWakeDelayMs);
+  waitBeforeWakeAttempt();
 
   if (!runStartupWakeSequence()) {
     Serial.println("Battery wake attempt failed.");
@@ -84,8 +87,30 @@ static void beginDebugSerial()
   Serial.begin(kSerialBaud);
 
   const uint32_t startedAt = millis();
+  uint32_t previousBlinkMillis = 0;
+  bool ledOn = false;
+
   while (!Serial && millis() - startedAt < kUsbSerialConnectWaitMs) {
-    delay(10);
+    const uint32_t now = millis();
+    if (now - previousBlinkMillis >= 250) {
+      previousBlinkMillis = now;
+      ledOn = !ledOn;
+      digitalWrite(kStatusLedPin, ledOn ? kLedOnLevel : kLedOffLevel);
+    }
+
+    delay(5);
+  }
+
+  digitalWrite(kStatusLedPin, kLedOffLevel);
+}
+
+static void waitBeforeWakeAttempt()
+{
+  const uint32_t startedAt = millis();
+
+  while (millis() - startedAt < kBootWakeDelayMs) {
+    blinkStatus(1, 70, 430);
+    canPrintReceivedMessages();
   }
 }
 
@@ -145,18 +170,22 @@ static uint8_t breathingBrightness()
   return kBreathingMinBrightness + ((ramp * range) / halfPeriod);
 }
 
+static void blinkStatus(uint8_t count, uint16_t onMs, uint16_t offMs)
+{
+  for (uint8_t flash = 0; flash < count; flash++) {
+    digitalWrite(kStatusLedPin, kLedOnLevel);
+    delay(onMs);
+    digitalWrite(kStatusLedPin, kLedOffLevel);
+    delay(offMs);
+  }
+}
+
 static void blinkCanFailure()
 {
   digitalWrite(kStatusLedPin, kLedOffLevel);
 
   while (true) {
-    for (uint8_t flash = 0; flash < 3; flash++) {
-      digitalWrite(kStatusLedPin, kLedOnLevel);
-      delay(120);
-      digitalWrite(kStatusLedPin, kLedOffLevel);
-      delay(120);
-    }
-
+    blinkStatus(3, 120, 120);
     delay(900);
   }
 }
